@@ -671,205 +671,205 @@ class SaleOrder(models.Model):
         commit_count = 0
         woo_taxes={}
         for queue_line in queue_lines:
-            commit_count += 1
-            if commit_count == 5:
-                # This is used for commit every 5 orders
-                queue_line.order_data_queue_id.is_process_queue = True
-                self._cr.commit()
-                commit_count = 0
-            if woo_instance != queue_line.instance_id:
-                woo_instance = queue_line.instance_id
-#                woo_taxes = {}
-#                if woo_instance.apply_tax == "create_woo_tax":
-#                    woo_taxes = self.get_tax_ids(woo_instance)
-#                    if isinstance(woo_taxes, str):
-#                        self.create_woo_log_lines(woo_taxes, common_log_book_id, queue_line)
-#                        continue
+            try:
+                commit_count += 1
+                if commit_count == 5:
+                    # This is used for commit every 5 orders
+                    queue_line.order_data_queue_id.is_process_queue = True
+                    self._cr.commit()
+                    commit_count = 0
+                if woo_instance != queue_line.instance_id:
+                    woo_instance = queue_line.instance_id
 
-            if not queue_line.order_data:
-                queue_line.state = "failed"
-                continue
+                if not queue_line.order_data:
+                    queue_line.state = "failed"
+                    continue
 
-            order_data = ast.literal_eval(queue_line.order_data)
-            queue_line.processed_at = fields.Datetime.now()
-            existing_order = self.search([("woo_instance_id", "=", woo_instance.id),
-                                          ("woo_order_id", "=", order_data.get("id")),
-                                          ("woo_order_number", "=", order_data.get("number"))]).ids
-            if not existing_order:
-                existing_order = self.search([("woo_instance_id", '=', woo_instance.id),
-                                              ("client_order_ref", "=", order_data.get("number"))]).ids
-            if existing_order:
-                queue_line.state = "done"
-                continue
+                order_data = ast.literal_eval(queue_line.order_data)
+                queue_line.processed_at = fields.Datetime.now()
+                existing_order = self.search([("woo_instance_id", "=", woo_instance.id),
+                                              ("woo_order_id", "=", order_data.get("id")),
+                                              ("woo_order_number", "=", order_data.get("number"))]).ids
+                if not existing_order:
+                    existing_order = self.search([("woo_instance_id", '=', woo_instance.id),
+                                                  ("client_order_ref", "=", order_data.get("number"))]).ids
+                if existing_order:
+                    queue_line.state = "done"
+                    continue
 
-            financial_status = "paid"
-            if order_data.get("transaction_id"):
                 financial_status = "paid"
-            elif order_data.get("date_paid") and order_data.get("payment_method") != "cod" and order_data.get("status") == "processing":
-                financial_status = "paid"
-            else:
-                financial_status = "not_paid"
+                if order_data.get("transaction_id"):
+                    financial_status = "paid"
+                elif order_data.get("date_paid") and order_data.get("payment_method") != "cod" and order_data.get("status") == "processing":
+                    financial_status = "paid"
+                else:
+                    financial_status = "not_paid"
 
-            workflow_config = False
-            no_payment_gateway = False
+                workflow_config = False
+                no_payment_gateway = False
 
-            payment_gateway = self.create_or_update_payment_gateway(woo_instance, order_data)
-            no_payment_gateway = self.verify_order_for_payment_method(order_data)
+                payment_gateway = self.create_or_update_payment_gateway(woo_instance, order_data)
+                no_payment_gateway = self.verify_order_for_payment_method(order_data)
 
-            if payment_gateway:
-                workflow_config = sale_auto_workflow_obj.search(
+                if payment_gateway:
+                    workflow_config = sale_auto_workflow_obj.search(
+                            [("woo_instance_id", "=", woo_instance.id),
+                             ("woo_financial_status", "=", financial_status),
+                             ("woo_payment_gateway_id", "=", payment_gateway.id)], limit=1)
+                elif no_payment_gateway:
+                    payment_gateway = self.env['woo.payment.gateway'].search([
+                        ("code", "=", "no_payment_method"), ("woo_instance_id", "=", woo_instance.id)])
+                    workflow_config = sale_auto_workflow_obj.search(
                         [("woo_instance_id", "=", woo_instance.id),
                          ("woo_financial_status", "=", financial_status),
                          ("woo_payment_gateway_id", "=", payment_gateway.id)], limit=1)
-            elif no_payment_gateway:
-                payment_gateway = self.env['woo.payment.gateway'].search([
-                    ("code", "=", "no_payment_method"), ("woo_instance_id", "=", woo_instance.id)])
-                workflow_config = sale_auto_workflow_obj.search(
-                    [("woo_instance_id", "=", woo_instance.id),
-                     ("woo_financial_status", "=", financial_status),
-                     ("woo_payment_gateway_id", "=", payment_gateway.id)], limit=1)
-            else:
-                message = """- System could not find the payment gateway response from WooCommerce store.\n- The response received from Woocommerce store was - Empty."""
-                self.create_woo_log_lines(message, common_log_book_id, queue_line)
-                queue_line.write({"state":"failed"})
-                continue
+                else:
+                    message = """- System could not find the payment gateway response from WooCommerce store.\n- The response received from Woocommerce store was - Empty."""
+                    self.create_woo_log_lines(message, common_log_book_id, queue_line)
+                    queue_line.write({"state":"failed"})
+                    continue
 
-            if not workflow_config:
-                message = """- While creating order, based on combination of Payment Gateway '%s' and Woo Financial Status is %s,\n system tries to find out what all automated operations are to be applied on that given sales order.\n- Unfortunately system couldn't find that record under Financial Status records.\n- Please configure it under Woo configuration -> Financial Status and try again.""" % (
-                    financial_status, order_data.get("payment_method"))
+                if not workflow_config:
+                    message = """- While creating order, based on combination of Payment Gateway '%s' and Woo Financial Status is %s,\n system tries to find out what all automated operations are to be applied on that given sales order.\n- Unfortunately system couldn't find that record under Financial Status records.\n- Please configure it under Woo configuration -> Financial Status and try again.""" % (
+                        financial_status, order_data.get("payment_method"))
 
-                # message = "Workflow not found for Payment Gateway %s and financial status is %s." % (
-                #     financial_status, order_data.get("payment_method"))
-                self.create_woo_log_lines(message, common_log_book_id, queue_line)
-                continue
+                    # message = "Workflow not found for Payment Gateway %s and financial status is %s." % (
+                    #     financial_status, order_data.get("payment_method"))
+                    self.create_woo_log_lines(message, common_log_book_id, queue_line)
+                    continue
 
-            workflow = workflow_config.woo_auto_workflow_id
-            if not workflow.picking_policy:
-                message = """- It seems Picking Policy value required to manage the Delivery Order is not set under Auto Workflow named %s.\n- Please configure it under WooCommerce -> Configuration -> Sales Auto Workflow.""" % (
-                    workflow.name)
-                # message = "Sale Auto Workflow is not configured properly. Please check it."
-                self.create_woo_log_lines(message, common_log_book_id, queue_line)
-                continue
+                workflow = workflow_config.woo_auto_workflow_id
+                if not workflow.picking_policy:
+                    message = """- It seems Picking Policy value required to manage the Delivery Order is not set under Auto Workflow named %s.\n- Please configure it under WooCommerce -> Configuration -> Sales Auto Workflow.""" % (
+                        workflow.name)
+                    # message = "Sale Auto Workflow is not configured properly. Please check it."
+                    self.create_woo_log_lines(message, common_log_book_id, queue_line)
+                    continue
 
-            woo_customer_id = order_data.get("customer_id", False)
-            partner_obj = self.env['res.partner']
-            partner = partner_obj.woo_create_or_update_customer(woo_customer_id,
-                                                         order_data.get("billing"), True,
-                                                         instance=woo_instance)
-            parent_id = partner.id
-            if partner.parent_id:
-                parent_id = partner.parent_id.id
-            shipping_partner = partner_obj.woo_create_or_update_customer(False, order_data.get("shipping"), False,
-                                                                  parent_id=parent_id,
-                                                                  type="delivery",
-                                                                  instance=woo_instance) if order_data.get("shipping", False) else partner
+                woo_customer_id = order_data.get("customer_id", False)
+                partner_obj = self.env['res.partner']
+                partner = partner_obj.woo_create_or_update_customer(woo_customer_id,
+                                                             order_data.get("billing"), True,
+                                                             instance=woo_instance)
+                parent_id = partner.id
+                if partner.parent_id:
+                    parent_id = partner.parent_id.id
+                shipping_partner = partner_obj.woo_create_or_update_customer(False, order_data.get("shipping"), False,
+                                                                      parent_id=parent_id,
+                                                                      type="delivery",
+                                                                      instance=woo_instance) if order_data.get("shipping", False) else partner
 
-            if not shipping_partner:
-                shipping_partner = partner
+                if not shipping_partner:
+                    shipping_partner = partner
 
-            order_vals = self.prepare_woo_order_vals(order_data, woo_instance, partner,
-                                                     shipping_partner, workflow, payment_gateway)
+                order_vals = self.prepare_woo_order_vals(order_data, woo_instance, partner,
+                                                         shipping_partner, workflow, payment_gateway)
 
-            sale_order = self.create(order_vals)
+                sale_order = self.create(order_vals)
 
-            tax_included = order_data.get("prices_include_tax")
+                tax_included = order_data.get("prices_include_tax")
 
-            order_lines,woo_taxes = self.create_woo_sale_order_lines(queue_line, order_data.get(
-                    "line_items"), sale_order, tax_included, common_log_book_id,woo_taxes)
-            if not order_lines:
-                sale_order.sudo().unlink()
-                queue_line.state = "failed"
-                continue
+                order_lines,woo_taxes = self.create_woo_sale_order_lines(queue_line, order_data.get(
+                        "line_items"), sale_order, tax_included, common_log_book_id,woo_taxes)
+                if not order_lines:
+                    sale_order.sudo().unlink()
+                    queue_line.state = "failed"
+                    continue
 
-            for shipping_line in order_data.get("shipping_lines"):
-                delivery_method = shipping_line.get("method_title")
-                if delivery_method:
-                    carrier = delivery_carrier_obj.search(
-                            [("woo_code", "=", delivery_method)], limit=1)
-                    if not carrier:
+                for shipping_line in order_data.get("shipping_lines"):
+                    delivery_method = shipping_line.get("method_title")
+                    if delivery_method:
                         carrier = delivery_carrier_obj.search(
-                                [("name", "=", delivery_method)], limit=1)
-                    if not carrier:
-                        carrier = delivery_carrier_obj.search(
-                                ["|", ("name", "ilike", delivery_method),
-                                 ("woo_code", "ilike", delivery_method)], limit=1)
-                    if not carrier:
-                        product_template = product_template_obj.search(
-                                [("name", "=", delivery_method),
-                                 ("type", "=", "service")], limit=1)
-                        if not product_template:
-                            product_template = product_template_obj.create(
-                                    {"name":delivery_method,
-                                     "type":"service"})
+                                [("woo_code", "=", delivery_method)], limit=1)
+                        if not carrier:
+                            carrier = delivery_carrier_obj.search(
+                                    [("name", "=", delivery_method)], limit=1)
+                        if not carrier:
+                            carrier = delivery_carrier_obj.search(
+                                    ["|", ("name", "ilike", delivery_method),
+                                     ("woo_code", "ilike", delivery_method)], limit=1)
+                        if not carrier:
+                            product_template = product_template_obj.search(
+                                    [("name", "=", delivery_method),
+                                     ("type", "=", "service")], limit=1)
+                            if not product_template:
+                                product_template = product_template_obj.create(
+                                        {"name":delivery_method,
+                                         "type":"service"})
 
-                        carrier = delivery_carrier_obj.create({"name":delivery_method,
-                                                               "woo_code":delivery_method,
-                                                               "fixed_price":shipping_line.get("total"),
-                                                               "product_id":product_template.product_variant_ids[0].id})
-                    shipping_product = carrier.product_id
-                    sale_order.write({"carrier_id":carrier.id})
+                            carrier = delivery_carrier_obj.create({"name":delivery_method,
+                                                                   "woo_code":delivery_method,
+                                                                   "fixed_price":shipping_line.get("total"),
+                                                                   "product_id":product_template.product_variant_ids[0].id})
+                        shipping_product = carrier.product_id
+                        sale_order.write({"carrier_id":carrier.id})
 
-                    taxes = []
-                    if woo_taxes:
-                        line_taxes = shipping_line.get("taxes")
-                        for tax in line_taxes:
-                            taxes.append(woo_taxes[tax["id"]])
+                        taxes = []
+                        if woo_taxes:
+                            line_taxes = shipping_line.get("taxes")
+                            for tax in line_taxes:
+                                taxes.append(woo_taxes[tax["id"]])
 
+                        if tax_included:
+                            total_shipping = float(shipping_line.get("total", 0.0)) + float(shipping_line.get("total_tax", 0.0))
+                        else:
+                            total_shipping = float(shipping_line.get("total", 0.0))
+                        self.create_woo_order_line(shipping_line.get("id"), shipping_product, 1,
+                                                   sale_order, total_shipping, taxes,
+                                                   tax_included, woo_instance, True)
+                        _logger.info("Shipping line is created.")
+
+                for fee_line in order_data.get("fee_lines"):
                     if tax_included:
-                        total_shipping = float(shipping_line.get("total", 0.0)) + float(shipping_line.get("total_tax", 0.0))
+                        total_fee = float(fee_line.get("total", 0.0)) + float(fee_line.get("total_tax", 0.0))
                     else:
-                        total_shipping = float(shipping_line.get("total", 0.0))
-                    self.create_woo_order_line(shipping_line.get("id"), shipping_product, 1,
-                                               sale_order, total_shipping, taxes,
-                                               tax_included, woo_instance, True)
-                    _logger.info("Shipping line is created.")
+                        total_fee = float(fee_line.get("total", 0.0))
+                    if total_fee:
+                        taxes = []
+                        if woo_taxes:
+                            line_taxes = fee_line.get("taxes")
+                            for tax in line_taxes:
+                                taxes.append(woo_taxes[tax["id"]])
 
-            for fee_line in order_data.get("fee_lines"):
-                if tax_included:
-                    total_fee = float(fee_line.get("total", 0.0)) + float(fee_line.get("total_tax", 0.0))
+                        self.create_woo_order_line(fee_line.get("id"), woo_instance.fee_line_id, 1,
+                                                   sale_order, total_fee, taxes, tax_included,
+                                                   woo_instance)
+                        _logger.info("Fee line is created.")
+
+                woo_coupons = []
+                for coupon_line in order_data.get("coupon_lines"):
+                    coupon_code = coupon_line["code"]
+                    coupon = woo_coupon_obj.search([("code", "=", coupon_code),
+                                                    ("woo_instance_id", "=", woo_instance.id)])
+                    if coupon:
+                        woo_coupons.append(coupon.id)
+                        _logger.info("Coupon {0} added.".format(coupon_code))
+                    else:
+                        message = "The coupon {0} could not be added as it is not imported in odoo.".format(coupon_line["code"])
+                        sale_order.message_post(body=message)
+                        _logger.info("Coupon {0} not found.".format(coupon_line["code"]))
+                sale_order.woo_coupon_ids = [(6, 0, woo_coupons)]
+
+                customer_loc = self.env['stock.location'].search([('usage', '=', 'customer')], limit=1)
+                if order_data.get('status') == 'completed':
+                    sale_order.auto_workflow_process_id.shipped_order_workflow(sale_order,customer_loc)
                 else:
-                    total_fee = float(fee_line.get("total", 0.0))
-                if total_fee:
-                    taxes = []
-                    if woo_taxes:
-                        line_taxes = fee_line.get("taxes")
-                        for tax in line_taxes:
-                            taxes.append(woo_taxes[tax["id"]])
-
-                    self.create_woo_order_line(fee_line.get("id"), woo_instance.fee_line_id, 1,
-                                               sale_order, total_fee, taxes, tax_included,
-                                               woo_instance)
-                    _logger.info("Fee line is created.")
-
-            woo_coupons = []
-            for coupon_line in order_data.get("coupon_lines"):
-                coupon_code = coupon_line["code"]
-                coupon = woo_coupon_obj.search([("code", "=", coupon_code),
-                                                ("woo_instance_id", "=", woo_instance.id)])
-                if coupon:
-                    woo_coupons.append(coupon.id)
-                    _logger.info("Coupon {0} added.".format(coupon_code))
-                else:
-                    message = "The coupon {0} could not be added as it is not imported in odoo.".format(coupon_line["code"])
-                    sale_order.message_post(body=message)
-                    _logger.info("Coupon {0} not found.".format(coupon_line["code"]))
-            sale_order.woo_coupon_ids = [(6, 0, woo_coupons)]
-
-            customer_loc = self.env['stock.location'].search([('usage', '=', 'customer')], limit=1)
-            if order_data.get('status') == 'completed':
-                sale_order.auto_workflow_process_id.shipped_order_workflow(sale_order,customer_loc)
-            else:
-                self.env["sale.workflow.process.ept"].auto_workflow_process(
-                        sale_order.auto_workflow_process_id.id,
-                        sale_order.ids)
-            new_orders += sale_order
-            queue_line.write({"sale_order_id":sale_order.id, "state":"done"})
-            _logger.info("Sale order %s is created from queue line." % (order_data.get("id")))
-        # Below line add by Haresh Mori on date 7/1/2020 this is used for set the is queue process
-        # as False,To manage which queue is running in background.
-        queue_lines.order_data_queue_id.is_process_queue = False
+                    self.env["sale.workflow.process.ept"].auto_workflow_process(
+                            sale_order.auto_workflow_process_id.id,
+                            sale_order.ids)
+                new_orders += sale_order
+                queue_line.write({"sale_order_id":sale_order.id, "state":"done"})
+                _logger.info("Sale order %s is created from queue line." % (order_data.get("id")))
+            except Exception as error:
+                message = "Error :- %s " %error
+                self.create_woo_log_lines(message, common_log_book_id, queue_line)
+                queue_line.write({"state": "failed"})
+                continue
+            # Below line add by Haresh Mori on date 7/1/2020 this is used for set the is queue process
+            # as False,To manage which queue is running in background.
+            queue_lines.order_data_queue_id.is_process_queue = False
         return new_orders
-
+        
     @api.model
     def update_woo_order_status(self, woo_instance):
         """
@@ -972,22 +972,43 @@ class SaleOrder(models.Model):
         @param order_data: Dictionary of order's data.
         @param instance: Instance of Woo.
         """
-        order_data_queue = self.create_woo_order_data_queue(instance, [order_data],
-                                                            "Order#" + order_data.get("number", ""),
-                                                            "webhook")
-        self._cr.commit()
+        sale_order_obj = self.env["sale.order"]
+        common_log_book_obj = self.env['common.log.book.ept']
+        log_line_obj = self.env["common.log.lines.ept"]
+        woo_order_data_queue_obj = self.env["woo.order.data.queue.ept"]
 
-        if order_data_queue:
-            if update_order and self.search_read([("woo_instance_id", "=", instance.id),
-                                                  ("woo_order_id", "=", order_data.get("id")),
-                                                  ("woo_order_number", "=", order_data.get("number"))], ["id"]):
-                order_data_queue.order_data_queue_line_ids.process_order_queue_line(update_order)
-                _logger.info("Updated order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
-            else:
-                order_data_queue.order_data_queue_line_ids.process_order_queue_line()
-                _logger.info("Imported order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
-        _logger.info("Processed order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
-        return True
+        if update_order:
+            order_queue = woo_order_data_queue_obj.search(
+                [('instance_id', '=', instance.id), ('created_by', '=', 'webhook'),
+                 ('state', '=', 'draft')], limit=1)
+            order_queue and order_queue.create_woo_data_queue_lines([order_data])
+            order_queue and _logger.info(
+                "Added woo order number : %s in existing order queue webhook queue %s" % (
+                    order_data.get('number'), order_queue.display_name))
+            if order_queue and len(order_queue.order_data_queue_line_ids) >= 50:
+                order_queue.order_data_queue_line_ids.process_order_queue_line()
+            elif not order_queue:
+                order_data_queue = self.create_woo_order_data_queue(instance, [order_data], '',
+                                                                    "webhook")
+                _logger.info(
+                    "Created order data queue : %s as receive response from update order webhook" % order_data_queue.display_name)
+        else:
+            order_data_queue = self.create_woo_order_data_queue(instance, [order_data],
+                                                                "Order#" + order_data.get("number", ""),
+                                                                "webhook")
+            self._cr.commit()
+
+            if order_data_queue:
+                if update_order and self.search_read([("woo_instance_id", "=", instance.id),
+                                                      ("woo_order_id", "=", order_data.get("id")),
+                                                      ("woo_order_number", "=", order_data.get("number"))], ["id"]):
+                    order_data_queue.order_data_queue_line_ids.process_order_queue_line(update_order)
+                    _logger.info("Updated order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
+                else:
+                    order_data_queue.order_data_queue_line_ids.process_order_queue_line()
+                    _logger.info("Imported order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
+            _logger.info("Processed order {0} of {1} via Webhook Successfully".format(order_data.get("id"), instance.name))
+            return True
 
     @api.model
     def update_woo_order(self, queue_line, log_book):

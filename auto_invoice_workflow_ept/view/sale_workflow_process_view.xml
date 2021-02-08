@@ -23,7 +23,7 @@
                                 <field name="inbound_payment_method_id"
                                        attrs="{'invisible':[('register_payment','=',False)],'required':[('register_payment','!=',False)]}"
                                        domain=""/>
-                                <field name="sale_journal_id" required="1"/>
+                                <field name="sale_journal_id"/>
                             </group>
                         </group>
                         <group>

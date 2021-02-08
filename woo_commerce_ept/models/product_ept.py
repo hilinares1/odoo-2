@@ -109,46 +109,24 @@ class WooProductTemplateEpt(models.Model):
         :param variant: It contain the woo product variant
         :return: return the image response in dictionary
         @author: Dipak Gogiya @Emipro Technologies Pvt. Ltd
+        Change Flow by Hardik Dhankecha @ Emipro on date 02 November 2020
         """
-        variant_img_keys = {}
-        key = False
         image_id = False
         variation_data = {}
-        if instance.woo_is_image_url:
-            if variant.response_url:
-                try:
-                    img = requests.get(variant.response_url, stream=True, verify=False, timeout=10)
-                    if img.status_code == 200:
-                        var_url = variant.response_url
-                    elif variant.woo_variant_url or variant.product_id.image_url:
-                        var_url = variant.woo_variant_url or variant.product_id.image_url or ''
-                except Exception:
-                    var_url = variant.woo_variant_url or variant.product_id.image_url or ''
-            elif variant.woo_variant_url or variant.product_id.image_url:
-                var_url = variant.woo_variant_url or variant.product_id.image_url or ''
-        else:
-            variant_images = variant.woo_image_ids
-            if variant_images:
-                if not variant_images[0].woo_image_id:
-                    res = img_file_upload.upload_image(instance, variant_images[0].image,
-                                                       "%s_%s" % (variant.name, variant.id))
-                    image_id = res and res.get('id', False) or ''
-                else:
-                    image_id = variant_images[0].woo_image_id
-        #         if var_url:
-        #             if instance.woo_version == 'wc/v2' or instance.woo_version == 'wc/v3':
-        #                 if instance.woo_is_image_url:
-        #                     variation_data.update({"image": {'src': var_url, 'position': 0}})
-        #                 else:
-        #                     variation_data.update({"image": {'id': var_url, 'position': 0}})
-        #             else:
-        #                 if instance.woo_is_image_url:
-        #                     variation_data.update({"image": [{'src': var_url, 'position': 0}]})
-        #                 else:
-        #                     variation_data.update({"image": [{'id': var_url, 'position': 0}]})
+        variant_images = variant.woo_image_ids
+
+        if variant_images:
+            if not variant_images[0].woo_image_id:
+                res = img_file_upload.upload_image(instance, variant_images[0].image,
+                                                   "%s_%s" % (variant.name, variant.id),variant_images[0].image_mime_type)
+                image_id = res and res.get('id', False) or ''
+            else:
+                image_id = variant_images[0].woo_image_id
+
         if image_id:
             variation_data.update({"image": {'id': image_id}})
             variant_images[0].woo_image_id = image_id
+
         return variation_data
 
     @api.model
@@ -2369,6 +2347,20 @@ class WooProductTemplateEpt(models.Model):
                  ("woo_instance_id", "=", woo_instance.id)], limit=1)
 
             template_title = data.get("name")
+
+            if data.get('type') not in ['simple','variable','bundle','grouped','external']:
+                message = "Product type is not compatible with the connector. Receive product type is: %s"%(data.get('type'))
+                common_log_line_obj.woo_create_product_log_line(message, model_id,
+                                                                product_data_queue_line if not order_queue_line
+                                                                else order_queue_line,
+                                                                common_log_book_id)
+                _logger.info(
+                    "Process Failed of Product {0}||Queue {1}||Reason is {2}".format(
+                        woo_product_template_id, product_queue_id, message))
+                if not order_queue_line:
+                    product_data_queue_line.state = "failed"
+                continue
+
             _logger.info(
                 "Process started for Product-{0}||{1}||Queue {2}.".format(woo_product_template_id,
                                                                           template_title,
@@ -3516,39 +3508,39 @@ class WooProductTemplateEpt(models.Model):
         gallery_images = woo_template.woo_image_ids.filtered(lambda x: not x.woo_variant_id)
         for br_gallery_image in gallery_images:
             image_id = br_gallery_image.woo_image_id
-            img_url = ''
-            if instance.woo_is_image_url:
-                if br_gallery_image.response_url:
-                    try:
-                        img = requests.get(br_gallery_image.response_url, stream=True, verify=False,
-                                           timeout=10)
-                        if img.status_code == 200:
-                            img_url = br_gallery_image.response_url
-                        elif br_gallery_image.url:
-                            img_url = br_gallery_image.url
-                    except Exception:
-                        img_url = br_gallery_image.url or ''
-                elif br_gallery_image.url:
-                    img_url = br_gallery_image.url
-            else:
-                if br_gallery_image.image and not image_id:
-                    key = hashlib.md5(br_gallery_image.image).hexdigest()
-                    if not key:
-                        continue
-                    if key in gallery_img_keys:
-                        continue
-                    else:
-                        gallery_img_keys.update({key: br_gallery_image.id})
-                    res = img_file_upload.upload_image(instance, br_gallery_image.image,
-                                                       "%s_%s_%s" % (
-                                                           template.name, template.categ_id.name,
-                                                           template.id))
-                    image_id = res and res.get('id', False) or ''
-            if image_id:
-                if instance.woo_is_image_url:
-                    tmpl_images.append({'src': img_url, 'position': position})
+            #img_url = ''
+            # if instance.woo_is_image_url:
+            #     if br_gallery_image.response_url:
+            #         try:
+            #             img = requests.get(br_gallery_image.response_url, stream=True, verify=False,
+            #                                timeout=10)
+            #             if img.status_code == 200:
+            #                 img_url = br_gallery_image.response_url
+            #             elif br_gallery_image.url:
+            #                 img_url = br_gallery_image.url
+            #         except Exception:
+            #             img_url = br_gallery_image.url or ''
+            #     elif br_gallery_image.url:
+            #         img_url = br_gallery_image.url
+            #else:
+            if br_gallery_image.image and not image_id:
+                key = hashlib.md5(br_gallery_image.image).hexdigest()
+                if not key:
+                    continue
+                if key in gallery_img_keys:
+                    continue
                 else:
-                    tmpl_images.append({'id': image_id, 'position': position})
+                    gallery_img_keys.update({key: br_gallery_image.id})
+                res = img_file_upload.upload_image(instance, br_gallery_image.image,
+                                                   "%s_%s_%s" % (
+                                                       template.name, template.categ_id.name,
+                                                       template.id),br_gallery_image.image_mime_type)
+                image_id = res and res.get('id', False) or ''
+            if image_id:
+                # if instance.woo_is_image_url:
+                #     tmpl_images.append({'src': img_url, 'position': position})
+                # else:
+                tmpl_images.append({'id': image_id, 'position': position})
                 position += 1
                 br_gallery_image.woo_image_id = image_id
         return tmpl_images

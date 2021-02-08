@@ -9,6 +9,7 @@ class woo_payment_gateway(models.Model):
     code = fields.Char("Payment Code", required=True,
                        help="The payment code should match Gateway ID in your WooCommerce Checkout Settings.")
     woo_instance_id = fields.Many2one("woo.instance.ept", string="Instance", required=True)
+    active = fields.Boolean(default=True)
     _sql_constraints = [('_payment_gateway_unique_constraint', 'unique(code,woo_instance_id)',
                          "Payment gateway code must be unique in the list")]
 

@@ -94,3 +94,13 @@ class WooManualQueueProcessEpt(models.TransientModel):
                 lambda x: x.state in ["draft", "failed"])
             coupon_queue_line_batch and coupon_queue_line_batch.process_coupon_queue_line()
         return True
+
+    def woo_action_archive(self):
+        """ This method is used to call a child of the instance to active/inactive instance and its data.
+            @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 07 Jan 2021.
+            Task_id: 169829
+        """
+        instance_obj = self.env['woo.instance.ept']
+        instances = instance_obj.browse(self._context.get('active_ids'))
+        for instance in instances:
+            instance.woo_action_archive()

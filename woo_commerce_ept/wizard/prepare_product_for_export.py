@@ -9,6 +9,7 @@ from io import StringIO, BytesIO
 from odoo import models, fields, _
 from odoo.exceptions import ValidationError, Warning
 from _collections import OrderedDict
+from odoo.tools.mimetypes import guess_mimetype
 
 _logger = logging.getLogger("Woo")
 
@@ -112,10 +113,15 @@ class PrepareProductForExport(models.TransientModel):
                 woo_product_image = woo_product_image_obj.search_read(
                     [("woo_template_id", "=", woo_template_id),
                      ("odoo_image_id", "=", odoo_image.id)], ["id"])
+                if woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(woo_product_image.image))
+                    woo_product_image.write({'image_mime_type': mimetype})
                 if not woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(odoo_image.image))
                     woo_product_image_list.append({
                         "odoo_image_id": odoo_image.id,
-                        "woo_template_id": woo_template_id
+                        "woo_template_id": woo_template_id,
+                        "image_mime_type": mimetype
                     })
             if woo_product_image_list:
                 woo_product_image_obj.create(woo_product_image_list)
@@ -144,11 +150,16 @@ class PrepareProductForExport(models.TransientModel):
                     [("woo_template_id", "=", woo_template_id),
                      ("woo_variant_id", "=", woo_variant.id),
                      ("odoo_image_id", "=", odoo_image[0].id)], ["id"])
+                if woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(woo_product_image.image))
+                    woo_product_image.write({'image_mime_type': mimetype})
                 if not woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(odoo_image[0].image))
                     woo_product_image_obj.create({
                         "odoo_image_id": odoo_image[0].id,
                         "woo_variant_id": woo_variant.id,
                         "woo_template_id": woo_template_id,
+                        "image_mime_type": mimetype
                     })
 
             # pricelist_item = self.env['product.pricelist.item'].search(
@@ -343,10 +354,15 @@ class PrepareProductForExport(models.TransientModel):
                 woo_product_image = woo_product_image_obj.search_read(
                     [("woo_template_id", "=", woo_template_id),
                      ("odoo_image_id", "=", odoo_image.id)], ["id"])
+                if woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(woo_product_image.image))
+                    woo_product_image.write({'image_mime_type': mimetype})
                 if not woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(odoo_image.image))
                     woo_product_image_list.append({
                         "odoo_image_id": odoo_image.id,
-                        "woo_template_id": woo_template_id
+                        "woo_template_id": woo_template_id,
+                        "image_mime_type": mimetype
                     })
             if woo_product_image_list:
                 woo_product_image_obj.create(woo_product_image_list)
@@ -382,11 +398,16 @@ class PrepareProductForExport(models.TransientModel):
                     [("woo_template_id", "=", woo_template_id),
                      ("woo_variant_id", "=", woo_variant.id),
                      ("odoo_image_id", "=", odoo_image[0].id)], ["id"])
+                if woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(woo_product_image.image))
+                    woo_product_image.write({'image_mime_type': mimetype})
                 if not woo_product_image:
+                    mimetype = guess_mimetype(base64.b64decode(odoo_image[0].image))
                     woo_product_image_obj.create({
                         "odoo_image_id": odoo_image[0].id,
                         "woo_variant_id": woo_variant.id,
                         "woo_template_id": woo_template_id,
+                        "image_mime_type": mimetype
                     })
 
             # pricelist_item = self.env['product.pricelist.item'].search(

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 {
     'name': 'Odoo WooCommerce Connector',
-    'version': '13.0.37',
+    'version': '13.0.39',
     'license': 'OPL-1',
     'category': 'Sale',
     'summary': 'Odoo Woocommerce Connector helps you automate your vital business processes at Odoo by enabling '
@@ -16,6 +16,7 @@
              'data/product_data.xml',
              'data/ir_sequence.xml',
              'data/ir_cron_data.xml',
+             'data/ir_cron_data_inherit.xml',
              'data/import_order_status_ept.xml',
              'wizard/manual_queue_process_ept.xml',
              'wizard/cron_configuration_ept.xml',

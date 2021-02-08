@@ -373,6 +373,10 @@ class woo_instance_ept(models.Model):
 
     weight_uom_id = fields.Many2one("uom.uom", string="Weight UoM",
                                     default=lambda self:self.env.ref("uom.product_uom_kgm"))
+    tax_rounding_method = fields.Selection([("round_per_line", "Round per Line"),
+                                            ("round_globally", "Round Globally")],
+                                           default="round_per_line",
+                                           string="Tax Rounding Method")
 
     _sql_constraints = [('unique_host', 'unique(woo_host)',
                          "Instance already exists for given host. Host must be Unique for the instance!")]
@@ -384,27 +388,44 @@ class woo_instance_ept(models.Model):
         @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 09-12-2019.
         :Task id: 158502
         """
+        woo_template_obj = self.env['woo.product.template.ept']
+        woo_payment_gateway_obj = self.env['woo.payment.gateway']
+        woo_auto_workflow_configuration_obj = self.env['woo.sale.auto.workflow.configuration']
+        domain = [('woo_instance_id', '=', self.id)]
         if self.active:
-            self.active = False
-            self.write({'state': 'not_confirmed'})
-            auto_crons = self.env["ir.cron"].search(
-                [("name", "ilike", self.name), ("active", "=", True)])
-            if auto_crons:
-                auto_crons.write({"active": False})
-                self.woo_stock_auto_export = False
-                self.auto_update_order_status = False
-                self.auto_import_order = False
-            webhooks = self.env["woo.webhook.ept"].search(
-                [("instance_id", "=", self.id), ("status", "=", "active")])
-            if webhooks:
-                webhooks.toggle_status("paused")
-            self.create_woo_product_webhook = False
-            self.create_woo_order_webhook = False
-            self.create_woo_customer_webhook = False
-            self.create_woo_coupon_webhook = False
+            self.update_instance_data(domain)
         else:
-            self.active = True
             self.confirm()
+            domain.append(('active', '=', False))
+            woo_template_obj.search(domain).write({'active': True})
+            woo_payment_gateway_obj.search(domain).write({'active': True})
+            woo_auto_workflow_configuration_obj.search(domain).write({'active': True})
+        self.active = not self.active
+
+    def update_instance_data(self, domain):
+        """
+        This method archives products, auto crons, payment gateways and financial statuses and deletes webhooks,
+        when an instance is archived.
+        """
+        woo_template_obj = self.env['woo.product.template.ept']
+        data_queue_mixin_obj = self.env['data.queue.mixin.ept']
+        ir_cron_obj = self.env["ir.cron"]
+        sale_auto_workflow_configuration_obj = self.env['woo.sale.auto.workflow.configuration']
+        payment_gateway_obj = self.env['woo.payment.gateway']
+        woo_webhook_obj = self.env["woo.webhook.ept"]
+        deactivate = {'active': False}
+
+        auto_crons = ir_cron_obj.search([("name", "ilike", self.name), ("active", "=", True)])
+        if auto_crons:
+            auto_crons.write(deactivate)
+        self.woo_stock_auto_export = self.auto_update_order_status = self.auto_import_order = False
+        woo_webhook_obj.search([('instance_id', '=', self.id)]).unlink()
+        self.create_woo_product_webhook = self.create_woo_order_webhook = self.create_woo_customer_webhook = \
+            self.create_woo_coupon_webhook = False
+        woo_template_obj.search(domain).write(deactivate)
+        sale_auto_workflow_configuration_obj.search(domain).write(deactivate)
+        payment_gateway_obj.search(domain).write(deactivate)
+        data_queue_mixin_obj.delete_data_queue_ept(is_delete_queue=True)
 
     @api.model
     def create(self, vals):
@@ -648,7 +669,7 @@ class woo_instance_ept(models.Model):
             So, creating this type of payment method for applying the auto workflow and picking
             policy in order.
             """
-            no_payment_method = self.env['woo.payment.gateway'].search([
+            no_payment_method = self.env['woo.payment.gateway'].with_context(active_test=False).search([
                 ("code", "=", "no_payment_method"), ("woo_instance_id", "=", self.id)])
             if not no_payment_method:
                 self.env['woo.payment.gateway'].create({"name":"No Payment Method",
@@ -773,3 +794,34 @@ class woo_instance_ept(models.Model):
             if available_webhooks:
                 available_webhooks.toggle_status("paused")
                 _logger.info("{0} Webhooks are paused of instance '{1}'.".format(resource, self.name))
+
+    def toggle_active(self):
+        """
+        This method is overridden for archiving other properties, while archiving the instance from the Action menu.
+        @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 07 Jan 2021.
+        Task_id: 169829
+        """
+        context = dict(self._context)
+        context.update({'active_ids': self.ids})
+        action = self[0].with_context(context).action_open_deactive_wizard() if self else False
+        return action
+
+    def action_open_deactive_wizard(self):
+        """ This method is used to open a wizard to display the information related to how many data active/inactive
+            while instance Active/Inactive.
+            @return: action
+            @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 07 Jan 2021.
+            Task_id: 169829
+        """
+        view = self.env.ref('woo_commerce_ept.view_inactive_woo_instance')
+        return {
+            'name': _('Instance Active/Inactive Details'),
+            'type': 'ir.actions.act_window',
+            'view_type': 'form',
+            'view_mode': 'form',
+            'res_model': 'woo.manual.queue.process.ept',
+            'views': [(view.id, 'form')],
+            'view_id': view.id,
+            'target': 'new',
+            'context': self._context,
+        }

@@ -2,28 +2,28 @@
 <odoo noupdate="1">
 
     <!-- Sync Product Cron -->
-    <record id="ir_cron_child_to_process_woo_synced_product_data"
-            model="ir.cron">
-        <field name="name">Woocommerce: Child Products Queue Cron</field>
-        <field name="model_id"
-               ref="model_woo_product_data_queue_line_ept"/>
-        <field name="state">code</field>
-        <field name="code">model.sync_woo_product_data()</field>
-        <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">10</field>
-        <field name="interval_type">minutes</field>
-        <field name="numbercall">1</field>
-    </record>
+<!--    <record id="ir_cron_child_to_process_woo_synced_product_data"-->
+<!--            model="ir.cron">-->
+<!--        <field name="name">Woocommerce: Child Products Queue Cron</field>-->
+<!--        <field name="model_id"-->
+<!--               ref="model_woo_product_data_queue_line_ept"/>-->
+<!--        <field name="state">code</field>-->
+<!--        <field name="code">model.sync_woo_product_data()</field>-->
+<!--        <field name="user_id" ref="base.user_root"/>-->
+<!--        <field name="interval_number">10</field>-->
+<!--        <field name="interval_type">minutes</field>-->
+<!--        <field name="numbercall">1</field>-->
+<!--    </record>-->
 
     <record id="ir_cron_parent_woo_product_process_child_cron"
             model="ir.cron">
-        <field name="name">Woocommerce: Parent Products Queue Cron</field>
+        <field name="name">Woocommerce: Process Products Queue</field>
         <field name="model_id"
                ref="model_woo_product_data_queue_line_ept"/>
         <field name="state">code</field>
         <field name="code">model.woo_product_process_child_cron()</field>
         <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">2</field>
+        <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
         <field name="numbercall">-1</field>
     </record>
@@ -31,84 +31,84 @@
     <!-- Woo Order Process Cron -->
     <record id="process_woo_order_data_queue_parent_cron"
             model="ir.cron">
-        <field name="name">WooCommerce:Parent Orders Queue Cron</field>
+        <field name="name">WooCommerce:Process Orders Queue</field>
         <field name="active" eval="True"/>
         <field name="model_id"
                ref="model_woo_order_data_queue_line_ept"/>
         <field name="state">code</field>
         <field name="code">model.check_child_cron()</field>
         <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">2</field>
+        <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
         <field name="numbercall">-1</field>
     </record>
 
-    <record id="process_woo_order_data_queue_child_cron"
-            model="ir.cron">
-        <field name="name">WooCommerce: Child Orders Queue Cron</field>
-        <field name="active" eval="False"/>
-        <field name="model_id"
-               ref="model_woo_order_data_queue_line_ept"/>
-        <field name="state">code</field>
-        <field name="code">model.auto_order_queue_lines_process()</field>
-        <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">10</field>
-        <field name="interval_type">minutes</field>
-        <field name="numbercall">1</field>
-    </record>
+<!--    <record id="process_woo_order_data_queue_child_cron"-->
+<!--            model="ir.cron">-->
+<!--        <field name="name">WooCommerce: Child Orders Queue Cron</field>-->
+<!--        <field name="active" eval="False"/>-->
+<!--        <field name="model_id"-->
+<!--               ref="model_woo_order_data_queue_line_ept"/>-->
+<!--        <field name="state">code</field>-->
+<!--        <field name="code">model.auto_order_queue_lines_process()</field>-->
+<!--        <field name="user_id" ref="base.user_root"/>-->
+<!--        <field name="interval_number">10</field>-->
+<!--        <field name="interval_type">minutes</field>-->
+<!--        <field name="numbercall">1</field>-->
+<!--    </record>-->
 
     <!--woo coupon cron-->
     <record id="process_woo_coupon_data_queue_parent_cron"
             model="ir.cron">
-        <field name="name">WooCommerce:Parent Coupon Queue Cron</field>
+        <field name="name">WooCommerce: Process Coupon Queue </field>
         <field name="active" eval="True"/>
         <field name="model_id"
                ref="model_woo_coupon_data_queue_line_ept"/>
         <field name="state">code</field>
         <field name="code">model.check_woo_coupon_child_cron()</field>
         <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">2</field>
+        <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
         <field name="numbercall">-1</field>
     </record>
 
-    <record id="process_woo_coupon_data_queue_child_cron"
-            model="ir.cron">
-        <field name="name">WooCommerce: Child Coupons Queue Cron</field>
-        <field name="active" eval="False"/>
-        <field name="model_id"
-               ref="model_woo_coupon_data_queue_line_ept"/>
-        <field name="state">code</field>
-        <field name="code">model.auto_coupon_queue_lines_process()</field>
-        <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">10</field>
-        <field name="interval_type">minutes</field>
-        <field name="numbercall">1</field>
-    </record>
+<!--    <record id="process_woo_coupon_data_queue_child_cron"-->
+<!--            model="ir.cron">-->
+<!--        <field name="name">WooCommerce: Child Coupons Queue Cron</field>-->
+<!--        <field name="active" eval="False"/>-->
+<!--        <field name="model_id"-->
+<!--               ref="model_woo_coupon_data_queue_line_ept"/>-->
+<!--        <field name="state">code</field>-->
+<!--        <field name="code">model.auto_coupon_queue_lines_process()</field>-->
+<!--        <field name="user_id" ref="base.user_root"/>-->
+<!--        <field name="interval_number">10</field>-->
+<!--        <field name="interval_type">minutes</field>-->
+<!--        <field name="numbercall">1</field>-->
+<!--    </record>-->
 
-    <record id="ir_cron_child_woo_customer_data_into_odoo"
-            model="ir.cron">
-        <field name="name">WooCommerce: Child Process Customer Queue</field>
-        <field name="active" eval="False"/>
-        <field name="model_id"
-               ref="model_woo_customer_data_queue_line_ept"/>
-        <field name="state">code</field>
-        <field name="code">model.woo_customer_data_queue_to_odoo()</field>
-        <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">10</field>
-        <field name="interval_type">minutes</field>
-        <field name="numbercall">1</field>
-    </record>
+<!--    <record id="ir_cron_child_woo_customer_data_into_odoo"-->
+<!--            model="ir.cron">-->
+<!--        <field name="name">WooCommerce: Child Process Customer Queue</field>-->
+<!--        <field name="active" eval="False"/>-->
+<!--        <field name="model_id"-->
+<!--               ref="model_woo_customer_data_queue_line_ept"/>-->
+<!--        <field name="state">code</field>-->
+<!--        <field name="code">model.woo_customer_data_queue_to_odoo()</field>-->
+<!--        <field name="user_id" ref="base.user_root"/>-->
+<!--        <field name="interval_number">10</field>-->
+<!--        <field name="interval_type">minutes</field>-->
+<!--        <field name="numbercall">1</field>-->
+<!--    </record>-->
 
     <record id="ir_cron_parent_woo_customer_process_child_cron"
             model="ir.cron">
-        <field name="name">WooCommerce: Parent Process Customer Queue</field>
+        <field name="name">WooCommerce: Process Customer Queue</field>
         <field name="model_id"
                ref="model_woo_customer_data_queue_line_ept"/>
         <field name="state">code</field>
         <field name="code">model.woo_customer_process_child_cron()</field>
         <field name="user_id" ref="base.user_root"/>
-        <field name="interval_number">2</field>
+        <field name="interval_number">5</field>
         <field name="interval_type">minutes</field>
         <field name="numbercall">-1</field>
     </record>

@@ -134,12 +134,13 @@ class ResPartner(models.Model):
             common_log_id.sudo().unlink()
         return customers
 
-    def woo_create_or_get_child_partner(self, partner_vals, key_list, parent_id, type):
-        partner = self._find_partner(partner_vals, key_list, [('parent_id', '=', parent_id)])
+    def woo_create_or_get_child_partner(self, partner_vals, key_list, parent_id, company_name, type):
+        #partner = self._find_partner(partner_vals, key_list, [('parent_id', '=', parent_id)])
+        partner = self.woocommerce_search_partner_with_and_without_company_name(partner_vals, key_list, company_name)
         if partner:
             return partner
         else:
-            partner = self._find_partner(partner_vals, key_list)
+            partner = self.woocommerce_search_partner_with_and_without_company_name(partner_vals, key_list, company_name)
             if partner:
                 return partner
             else:
@@ -216,16 +217,16 @@ class ResPartner(models.Model):
                 partner = partner.partner_id
                 if not parent_id:
                     parent_id = partner.id
-                return self.woo_create_or_get_child_partner(partner_vals, key_list, parent_id, 'invoice')
+                return self.woo_create_or_get_child_partner(partner_vals, key_list, parent_id, company_name, 'invoice')
             else:
-                partner = self._find_partner(partner_vals, key_list, [('parent_id', '=', False)])
+                partner = self.woocommerce_search_partner_with_and_without_company_name(partner_vals, key_list, company_name)
                 woo_partner_values = {
                     'woo_customer_id': woo_customer_id,
                     'woo_instance_id': woo_instance_id,
                     'woo_company_name_ept': company_name,
                 }
                 if partner:
-                    partner.write({'is_company': True, 'is_woo_customer': True})
+                    partner.write({'is_company': False, 'is_woo_customer': True})
                     woo_partner_values.update({'partner_id':partner.id})
                 else:
                     # There are chances a partner may already exist
@@ -234,7 +235,7 @@ class ResPartner(models.Model):
                     partner = self.search([("email", "=", email), ('parent_id', '=', False)], limit=1)
                     if partner:
                         parent_id = partner.id
-                        partner.write({'is_company': True, 'is_woo_customer': True})
+                        partner.write({'is_company': False, 'is_woo_customer': True})
                         partner_vals.update({'parent_id': parent_id, 'is_company': False, 'type': 'invoice'})
                         partner = self.create(partner_vals)
                         woo_partner_values.update({'partner_id': parent_id})
@@ -249,7 +250,7 @@ class ResPartner(models.Model):
                 self.create_woo_res_partner_ept(woo_partner_obj, woo_partner_values)
                 return partner
         else:
-            return self.woo_create_or_get_child_partner(partner_vals, key_list, parent_id, type)
+            return self.woo_create_or_get_child_partner(partner_vals, key_list, parent_id, company_name, type)
 
     def create_woo_res_partner_ept(self, woo_partner_obj, woo_partner_values):
         """
@@ -263,3 +264,27 @@ class ResPartner(models.Model):
             'woo_instance_id': woo_partner_values.get('woo_instance_id'),
             'woo_company_name_ept': woo_partner_values.get('woo_company_name_ept'),
         })
+
+    def woocommerce_search_partner_with_and_without_company_name(self, partner_vals, key_list, company_name):
+        """ This method is used to search partner with company name and without company name.
+            @return: res_partner
+            @author: Haresh Mori @Emipro Technologies Pvt. Ltd on date 24 November 2020 .
+            Task_id: 168479
+        """
+        res_partner = False
+        # If company name exists in response then search partner with company name.
+        if company_name:
+            partner_vals.update({'company_name': company_name})
+            key_list.append('company_name')
+            res_partner = self._find_partner(partner_vals, key_list, [])
+        # If company name exists in response and customer exists in odoo with address, so we search the customer with
+        # company False and set the company name in the existing customer.
+        if not res_partner and company_name:
+            res_partner = self._find_partner(partner_vals, key_list, [('company_name', '=', False)])
+            if res_partner:
+                res_partner.company_name = company_name
+        # If company name does not exists in response then search partner without company name.
+        if not res_partner and not company_name:
+            res_partner = self._find_partner(partner_vals, key_list, [])
+
+        return res_partner

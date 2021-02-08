@@ -63,7 +63,8 @@ class SaleOrder(models.Model):
         self.ensure_one()
         if work_flow_process_record.create_invoice:
             ctx = self._context.copy()
-            ctx.update({'journal_ept': work_flow_process_record.sale_journal_id})
+            if work_flow_process_record.sale_journal_id:
+                ctx.update({'journal_ept': work_flow_process_record.sale_journal_id})
             invoices = self.with_context(ctx)._create_invoices()
             self.validate_invoice_ept(invoices)
             if work_flow_process_record.register_payment:
@@ -133,9 +134,7 @@ class SaleOrder(models.Model):
             product_uom = order_line.product_uom
         if product and product_qty and product_uom:
             vals = {
-                'name': _('Auto processed move : %s') %
-                        (product.description_sale if product.description_sale
-                         else order_line.name),
+                'name': _('Auto processed move : %s')%product.display_name,
                 'company_id': self.company_id.id,
                 'product_id': product.id if product else False,
                 'product_uom_qty': product_qty,

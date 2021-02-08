@@ -143,15 +143,17 @@ class WooProductDataQueueLineEpt(models.Model):
         :return: It will return True if the process of sync products is successful completed
         @author: Dipak Gogiya @Emipro Technologies Pvt. Ltd
         """
-        child_cron_of_process = self.env.ref(
-            'woo_commerce_ept.ir_cron_child_to_process_woo_synced_product_data')
-        if child_cron_of_process and not child_cron_of_process.active:
-            results = self.search([('state', '=', 'draft')], limit=100)
-            if not results:
-                return True
-            child_cron_of_process.write({
-                'active': True,
-                'numbercall': 1,
-                'nextcall': datetime.now() + timedelta(seconds=10)
-                })
+        self.sync_woo_product_data()
         return True
+        # child_cron_of_process = self.env.ref(
+        #     'woo_commerce_ept.ir_cron_child_to_process_woo_synced_product_data')
+        # if child_cron_of_process and not child_cron_of_process.active:
+        #     results = self.search([('state', '=', 'draft')], limit=100)
+        #     if not results:
+        #         return True
+        #     child_cron_of_process.write({
+        #         'active': True,
+        #         'numbercall': 1,
+        #         'nextcall': datetime.now() + timedelta(seconds=10)
+        #         })
+        # return True

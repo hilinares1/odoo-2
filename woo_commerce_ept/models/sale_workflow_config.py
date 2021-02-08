@@ -11,6 +11,7 @@ class woo_sale_auto_workflow_configuration(models.Model):
 
     woo_instance_id = fields.Many2one("woo.instance.ept", "Instance", required=1)
     woo_payment_gateway_id = fields.Many2one("woo.payment.gateway", "Payment Gateway", required=1)
+    active = fields.Boolean(default=True)
 
     _sql_constraints = [('_workflow_unique_constraint', 'unique(woo_financial_status,woo_instance_id,'
                                                         'woo_payment_gateway_id)',

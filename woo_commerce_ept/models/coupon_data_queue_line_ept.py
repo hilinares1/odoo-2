@@ -62,14 +62,15 @@ class WooCouponDataQueueLineEpt(models.Model):
         Cron method which checks if draft order data is there, than make the child cron active.
         @author: Nilesh Parmar on Date 31 Dec 2019.
         """
-        child_cron = self.env.ref("woo_commerce_ept.process_woo_coupon_data_queue_child_cron")
-        if child_cron and not child_cron.active:
-            records = self.search([("state", "=", "draft")], limit=50).ids
-            if not records:
-                return True
-            child_cron.write({"active": True,
-                              "nextcall": datetime.now() + timedelta(seconds=10),
-                              "numbercall": 1})
+        # child_cron = self.env.ref("woo_commerce_ept.process_woo_coupon_data_queue_child_cron")
+        # if child_cron and not child_cron.active:
+        #     records = self.search([("state", "=", "draft")], limit=50).ids
+        #     if not records:
+        #         return True
+        #     child_cron.write({"active": True,
+        #                       "nextcall": datetime.now() + timedelta(seconds=10),
+        #                       "numbercall": 1})
+        self.auto_coupon_queue_lines_process()
         return True
 
     def auto_coupon_queue_lines_process(self):

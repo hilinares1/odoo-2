@@ -24,3 +24,4 @@ class WooProductImageEpt(models.Model):
     url = fields.Char(related="odoo_image_id.url", help="External URL of image")
     image = fields.Image(related="odoo_image_id.image")
     sequence = fields.Integer(help="Sequence of images.", index=True, default=10)
+    image_mime_type = fields.Char(help="This field is used to set image mine type.")

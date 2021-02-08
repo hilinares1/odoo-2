@@ -30,3 +30,4 @@ from . import coupons_ept
 from . import coupon_data_queue_ept
 from . import coupon_data_queue_line_ept
 from . import data_queue_mixin_ept
+from . import ir_cron

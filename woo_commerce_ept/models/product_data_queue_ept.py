@@ -1,6 +1,7 @@
 from odoo import models, fields, api
 import logging
-
+from datetime import datetime
+import json
 _logger = logging.getLogger("WooCommerce")
 
 
@@ -91,6 +92,8 @@ class WooProductDataQueueEpt(models.Model):
         This method used to create a product queue from webhook response.
         @author: Haresh Mori on Date 31-Dec-2019.
         """
+        process_import_export_obj = self.env["woo.process.import.export"]
+        product_queue_line_obj = self.env['woo.product.data.queue.line.ept']
         if product_data.get("type") == "variable":
             params = {"per_page": 100}
             response = wcapi.get("products/%s/variations" % (product_data.get("id")), params=params)
@@ -105,15 +108,38 @@ class WooProductDataQueueEpt(models.Model):
 
             if isinstance(variants_data, list):
                 product_data.update({"variations": variants_data})
+        product_data_queue = self.search(
+            [('woo_instance_id', '=', instance.id), ('created_by', '=', 'webhook'), ('state', '=', 'draft')], limit=1)
 
-        import_export = self.env["woo.process.import.export"].create(
-            {"woo_instance_id": instance.id})
-        product_data_queue = import_export.sudo().woo_import_products([product_data], "webhook")
-        _logger.info(
-            "Imported product {0} of {1} via Webhook Successfully.".format(product_data.get("id"),
-                                                                           instance.name))
+        if product_data_queue:
+            sync_queue_vals_line = {
+                'woo_instance_id': instance.id,
+                'synced_date': datetime.now(),
+                'queue_id': product_data_queue.id,
+                'woo_synced_data': json.dumps(product_data),
+                'woo_update_product_date': product_data.get('date_modified'),
+                'woo_synced_data_id': product_data.get('id'),
+                'name': product_data.get('name')
+            }
+            product_queue_line_obj.create(sync_queue_vals_line)
+            _logger.info("Added product id : %s in existing product queue %s" % (
+            product_data.get('id'), product_data_queue.display_name))
 
-        product_data_queue.queue_line_ids.sync_woo_product_data()
-        _logger.info(
-            "Processed product {0} of {1} via Webhook Successfully.".format(product_data.get("id"),
-                                                                            instance.name))
+        if product_data_queue and len(product_data_queue.queue_line_ids) >= 50:
+            product_data_queue.queue_line_ids.sync_woo_product_data()
+
+        elif not product_data_queue:
+            import_export = process_import_export_obj.create({"woo_instance_id": instance.id})
+            import_export.sudo().woo_import_products([product_data], "webhook")
+        # import_export = self.env["woo.process.import.export"].create(
+        #     {"woo_instance_id": instance.id})
+        #
+        # product_data_queue = import_export.sudo().woo_import_products([product_data], "webhook")
+        # _logger.info(
+        #     "Imported product {0} of {1} via Webhook Successfully.".format(product_data.get("id"),
+        #                                                                    instance.name))
+        #
+        # product_data_queue.queue_line_ids.sync_woo_product_data()
+        # _logger.info(
+        #     "Processed product {0} of {1} via Webhook Successfully.".format(product_data.get("id"),
+        #                                                                     instance.name))

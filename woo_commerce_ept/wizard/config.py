@@ -65,11 +65,14 @@ class WooInstanceConfig(models.TransientModel):
                                     consumer_secret=consumer_secret, verify_ssl=verify_ssl,
                                     wp_api=wp_api,
                                     version=version, query_string_auth=True)
-        r = wcapi.get("products", params={"_fields": "id"})
-        if not isinstance(r, requests.models.Response):
-            raise Warning(_("Response is not in proper format :: %s" % (r)))
-        if r.status_code != 200:
-            raise Warning(_("%s\n%s" % (r.status_code, r.reason)))
+        try:
+            response = wcapi.get("products", params={"_fields": "id"})
+        except Exception as error:
+            raise Warning(_(error))
+        if not isinstance(response, requests.models.Response):
+            raise Warning(_("Response is not in proper format :: %s" % (response)))
+        if response.status_code != 200:
+            raise Warning(_("%s\n%s" % (response.status_code, response.reason)))
 
         if self.woo_admin_username and self.woo_admin_password:
             """Checking if username and password are correct or not."""
@@ -189,6 +192,10 @@ class ResConfigSettings(models.TransientModel):
                                       domain=[('category_id.measure_type', '=', 'weight')])
     woo_set_sales_description_in_product = fields.Boolean("Use Sales Description of Odoo Product",
                                                           config_parameter="woo_commerce_ept.set_sales_description")
+    woo_tax_rounding_method = fields.Selection([("round_per_line", "Round per Line"),
+                                                ("round_globally", "Round Globally")],
+                                               default="round_per_line",
+                                               string="Woo Tax Rounding Method")
 
     @api.model
     def create(self, vals):
@@ -234,6 +241,7 @@ class ResConfigSettings(models.TransientModel):
 
             self.woo_attribute_type = instance.woo_attribute_type
             self.woo_weight_uom_id = instance.weight_uom_id
+            self.woo_tax_rounding_method = instance.tax_rounding_method
 
     @api.onchange('woo_company_id')
     def onchange_woo_company_id(self):
@@ -280,6 +288,7 @@ class ResConfigSettings(models.TransientModel):
 
             values["woo_attribute_type"] = self.woo_attribute_type
             values["weight_uom_id"] = self.woo_weight_uom_id
+            values["tax_rounding_method"] = self.woo_tax_rounding_method
 
             product_webhook_changed = customer_webhook_changed = order_webhook_changed = coupon_webhook_changed = False
             if instance.create_woo_product_webhook != self.create_woo_product_webhook:

@@ -2,6 +2,7 @@ import requests, base64
 import logging
 from odoo import models, fields, api, _
 from ..img_upload import img_file_upload
+from odoo.tools.mimetypes import guess_mimetype
 _logger = logging.getLogger("Woo")
 
 
@@ -446,9 +447,11 @@ class WooProductCategoryEpt(models.Model):
                 else:
                     res = {}
                     if woo_product_categ.image:
+                        mime_type = guess_mimetype(base64.b64decode(woo_product_categ.image))
                         res = img_file_upload.upload_image(instance, woo_product_categ.image,
                                                            "%s_%s" % (woo_product_categ.name,
-                                                                      woo_product_categ.id))
+                                                                      woo_product_categ.id),
+                                                           mime_type)
                     img_url = res and res.get('url', False) or ''
                 row_data = {'name': str(woo_product_categ.name),
                             'description': str(woo_product_categ.description or ''),
@@ -579,8 +582,10 @@ class WooProductCategoryEpt(models.Model):
                 else:
                     res = {}
                     if woo_categ.image:
+                        mime_type = guess_mimetype(base64.b64decode(woo_categ.image))
                         res = img_file_upload.upload_image(instance, woo_categ.image,
-                                                           "%s_%s" % (woo_categ.name, woo_categ.id))
+                                                           "%s_%s" % (woo_categ.name, woo_categ.id),
+                                                           mime_type)
                     img_url = res and res.get('url', False) or ''
 
                 row_data = {'name':str(woo_categ.name),

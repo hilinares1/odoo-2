@@ -39,33 +39,9 @@ class WooCustomerDataQueueLineEpt(models.Model):
         where is_process_queue = True""")
         self._cr.commit()
         start = time.time()
-        queue_lines = self
-        if self._context.get('line_ids', False):
-            queue_lines = self._context.get('line_ids')
-        elif not self:
-            query = """select queue.id
-                from woo_customer_data_queue_line_ept as queue_line
-                inner join woo_customer_data_queue_ept as queue on queue_line.queue_id = queue.id
-                where queue_line.state='draft' and queue.is_action_require = 'False'
-                ORDER BY queue_line.create_date ASC limit 1"""
-            self._cr.execute(query)
-            order_queue_data = self._cr.fetchone()
-            customer_queue = self.env["woo.customer.data.queue.ept"].browse(order_queue_data)
-            if not customer_queue:
-                return
-            queue_lines = customer_queue.queue_line_ids
-            customer_queue.queue_process_count += 1
-            if customer_queue.queue_process_count > 3:
-                customer_queue.is_action_require = True
-                note = "<p>Attention %s queue is processed 3 times you need to process it manually.</p>" % (customer_queue.name)
-                customer_queue.message_post(body=note)
-                if customer_queue.woo_instance_id.is_create_schedule_activity:
-                    model = self.env['ir.model'].search([('model', '=', 'woo.customer.data.queue.ept')])
-                    common_log_obj.create_woo_schedule_activity(customer_queue, model, True)
-                return
-            self._cr.commit()
-
-            # queue_lines = self.search([('state', '=', 'draft')], limit=100)
+        queue_lines = self.find_woo_customer_queue_lines()
+        if not queue_lines:
+            return
         partner_obj = self.env['res.partner']
         # Add by Haresh Mori on date 7/1/2020, Add commit after 10 customer record process and
         # also manage which queue is running in the background.
@@ -141,6 +117,50 @@ class WooCustomerDataQueueLineEpt(models.Model):
         _logger.info("Processed %s Customers in %s seconds." % (str(len(queue_lines)), str(end - start)))
         return True
 
+    def find_woo_customer_queue_lines(self):
+        """ This method used to find the customer queue lines which needs to process.
+                   @param : self
+                   @return: queue_lines
+                   @author: Hardik Dhankecha @Emipro Technologies Pvt. Ltd on date 03 November 2020 .
+               """
+        woo_customer_data_queue_obj = self.env["woo.customer.data.queue.ept"]
+        common_log_obj = self.env["common.log.book.ept"]
+        ir_model_obj = self.env['ir.model']
+        queue_lines = self
+        customer_queue_ids = []
+        if self._context.get('line_ids', False):
+            queue_lines = self._context.get('line_ids')
+        elif not self:
+            query = """select queue.id
+                        from woo_customer_data_queue_line_ept as queue_line
+                        inner join woo_customer_data_queue_ept as queue on queue_line.queue_id = queue.id
+                        where queue_line.state='draft' and queue.is_action_require = 'False'
+                        ORDER BY queue_line.create_date ASC limit 500"""
+            self._cr.execute(query)
+            customer_queue_list = self._cr.fetchall()
+
+            for result in customer_queue_list:
+                customer_queue_ids.append(result[0])
+
+            if not customer_queue_ids:
+                return False
+            customer_queues = woo_customer_data_queue_obj.browse(list(set(customer_queue_ids)))
+            for customer_queue in customer_queues:
+                customer_queue.queue_process_count += 1
+                if customer_queue.queue_process_count > 3:
+                    customer_queue.is_action_require = True
+                    note = "<p>Attention %s queue is processed 3 times you need to process it manually.</p>" % (
+                        customer_queue.name)
+                    customer_queue.message_post(body=note)
+                    if customer_queue.woo_instance_id.is_create_schedule_activity:
+                        model = ir_model_obj.search([('model', '=', 'woo.customer.data.queue.ept')])
+                        common_log_obj.create_woo_schedule_activity(customer_queue, model, True)
+                    continue
+                queue_lines += customer_queue.queue_line_ids
+                self._cr.commit()
+
+        return queue_lines
+
     def create_customer_queue_schedule_activity(self, queue_id):
         """
             this method is used to create a schedule activity for queue.
@@ -182,14 +202,15 @@ class WooCustomerDataQueueLineEpt(models.Model):
         @author: Pragnadeep Pitroda @Emipro Technologies Pvt. Ltd on date 30-10-2019.
         :Task id: 156886
         """
-        child_cron_of_process = self.env.ref('woo_commerce_ept.ir_cron_child_woo_customer_data_into_odoo')
-        if child_cron_of_process and not child_cron_of_process.active:
-            results = self.search([('state', '=', 'draft')], limit=100)
-            if not results:
-                return True
-            child_cron_of_process.write({
-                'active': True,
-                'numbercall': 1,
-                'nextcall': datetime.now() + timedelta(seconds=10)
-            })
+        # child_cron_of_process = self.env.ref('woo_commerce_ept.ir_cron_child_woo_customer_data_into_odoo')
+        # if child_cron_of_process and not child_cron_of_process.active:
+        #     results = self.search([('state', '=', 'draft')], limit=100)
+        #     if not results:
+        #         return True
+        #     child_cron_of_process.write({
+        #         'active': True,
+        #         'numbercall': 1,
+        #         'nextcall': datetime.now() + timedelta(seconds=10)
+        #     })
+        self.woo_customer_data_queue_to_odoo()
         return True

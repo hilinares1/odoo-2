@@ -13,21 +13,7 @@ class SaleWorkflowProcess(models.Model):
     _name = "sale.workflow.process.ept"
     _description = "sale workflow process"
 
-    @api.model
-    def _default_journal(self):
-        """
-        Added comment by Udit
-        It will return sout_invoice type journal of company passed in context or user's company.
-        """
-        account_journal_obj = self.env['account.journal']
-        inv_type = self._context.get('type', 'out_invoice')
-        inv_types = inv_type if isinstance(inv_type, list) else [inv_type]
-        company_id = self._context.get('company_id', self.env.company.id)
-        domain = [
-            ('type', 'in', list(filter(None, list(map(TYPE2JOURNAL.get, inv_types))))),
-            ('company_id', '=', company_id),
-        ]
-        return account_journal_obj.search(domain, limit=1)
+
 
     name = fields.Char(string='Name', size=64)
     validate_order = fields.Boolean("Validate Order", default=False)
@@ -39,8 +25,8 @@ class SaleWorkflowProcess(models.Model):
     journal_id = fields.Many2one('account.journal', string='Payment Journal',
                                  domain=[('type', 'in', ['cash', 'bank'])])
     sale_journal_id = fields.Many2one('account.journal', string='Sales Journal',
-                                      default=_default_journal,
                                       domain=[('type', '=', 'sale')])
+
 
     picking_policy = fields.Selection(
         [('direct', 'Deliver each product when available'),

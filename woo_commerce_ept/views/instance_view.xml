@@ -296,13 +296,13 @@
                                 attrs="{'invisible':[('active','=',False)]}">
                             <span class="o_stat_text">Scheduled Actions</span>
                         </button>
-                        <button class="oe_stat_button" name="woo_action_archive"
+                        <button class="oe_stat_button" name="action_open_deactive_wizard"
                                 icon="fa-lock" type="object"
                                 attrs="{'invisible': [('active','=',False)]}">
                             <span class="o_stat_text" style="color:#2dab2d">Active</span>
 
                         </button>
-                        <button class="oe_stat_button" name="woo_action_archive"
+                        <button class="oe_stat_button" name="action_open_deactive_wizard"
                                 icon="fa-unlock" type="object"
                                 attrs="{'invisible': [('active','=',True)]}">
                             <span class="o_stat_text" style="color:#da3434">Archive</span>

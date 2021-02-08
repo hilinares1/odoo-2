@@ -623,6 +623,19 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="woo_tax_rounding_method"/>
+                                <div class="text-muted">
+                                    How total tax amount is computed in WooCommerce orders.
+                                </div>
+                                <div class="content-group">
+                                    <div class="mt16 o_light_label">
+                                        <field name="woo_tax_rounding_method" widget="radio"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-12 col-lg-6 o_setting_box"
                              attrs="{'invisible':[('woo_apply_tax','=','odoo_tax')]}">
                             <div class="o_setting_right_pane">

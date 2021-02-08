@@ -58,14 +58,16 @@ class WooOrderDataQueueLineEpt(models.Model):
         Cron method which checks if draft order data is there, than make the child cron active.
         @author: Maulik Barad on Date 24-Oct-2019.
         """
-        child_cron = self.env.ref("woo_commerce_ept.process_woo_order_data_queue_child_cron")
-        if child_cron and not child_cron.active:
-            records = self.search([("state", "=", "draft")], limit=50).ids
-            if not records:
-                return True
-            child_cron.write({"active":True,
-                              "nextcall":datetime.now() + timedelta(seconds=10),
-                              "numbercall":1})
+        # child_cron = self.env.ref("woo_commerce_ept.process_woo_order_data_queue_child_cron")
+        # if child_cron and not child_cron.active:
+        #     records = self.search([("state", "=", "draft")], limit=50).ids
+        #     if not records:
+        #         return True
+        #     child_cron.write({"active":True,
+        #                       "nextcall":datetime.now() + timedelta(seconds=10),
+        #                       "numbercall":1})
+        self.auto_order_queue_lines_process()
+        
         return True
 
     def auto_order_queue_lines_process(self):
@@ -79,30 +81,32 @@ class WooOrderDataQueueLineEpt(models.Model):
         """
         # below two line add by Haresh Mori on date 7/1/2020, this is used to update
         # is_process_queue as False.
-        self.env.cr.execute("""update woo_order_data_queue_ept set is_process_queue = False where is_process_queue = True""")
+        self.env.cr.execute(
+            """update woo_order_data_queue_ept set is_process_queue = False where is_process_queue = True""")
         self._cr.commit()
         query = """select queue.id
-                from woo_order_data_queue_line_ept as queue_line
-                inner join woo_order_data_queue_ept as queue on queue_line.order_data_queue_id = queue.id
-                where queue_line.state='draft' and queue.is_action_require = 'False'
-                ORDER BY queue_line.create_date ASC limit 1"""
+                        from woo_order_data_queue_line_ept as queue_line
+                        inner join woo_order_data_queue_ept as queue on queue_line.order_data_queue_id = queue.id
+                        where queue_line.state='draft' and queue.is_action_require = 'False'
+                        ORDER BY queue_line.create_date ASC limit 150"""
         self._cr.execute(query)
-        order_queue_data = self._cr.fetchone()
-        if not order_queue_data:
+        order_queue_ids = self._cr.fetchall()
+        if not order_queue_ids:
             return
-        order_queue_id = self.env["woo.order.data.queue.ept"].browse(order_queue_data)
-        order_queue_lines = order_queue_id and order_queue_id.order_data_queue_line_ids.filtered(
-                lambda x:x.state == "draft")
-        order_queue_id.queue_process_count += 1
-        if order_queue_id.queue_process_count > 3:
-            order_queue_id.is_action_require = True
-            note = "<p>Attention %s queue is processed 3 times you need to process it manually.</p>" % (order_queue_id.name)
-            order_queue_id.message_post(body=note)
-            if order_queue_id.instance_id.is_create_schedule_activity:
-                self.create_order_queue_schedule_activity(order_queue_id)
-            return
-        self._cr.commit()
-        order_queue_lines and order_queue_lines.process_order_queue_line()
+        for order_queue_id in order_queue_ids:
+            queue = self.env["woo.order.data.queue.ept"].browse(order_queue_id)
+            order_queue_lines = queue and queue.order_data_queue_line_ids.filtered(
+                lambda x: x.state == "draft")
+            queue.queue_process_count += 1
+            if queue.queue_process_count > 3:
+                queue.is_action_require = True
+                note = "<p>Attention %s queue is processed 3 times you need to process it manually.</p>" % (queue.name)
+                queue.message_post(body=note)
+                if queue.instance_id.is_create_schedule_activity:
+                    self.create_order_queue_schedule_activity(queue)
+                return
+            self._cr.commit()
+            order_queue_lines and order_queue_lines.process_order_queue_line()
         return True
 
     def create_order_queue_schedule_activity(self, queue_id):

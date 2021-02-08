@@ -1,65 +1,71 @@
+# -*- coding: utf-8 -*-
+# See LICENSE file for full copyright and licensing details.
+'''
+In this file transfer images from odoo to woo-commerce.
+'''
 import tempfile
 import base64
-import logging
 import requests
-from odoo import models, fields, api, _
-from .. python_magic_0_4_11 import magic
-from .. wordpress_xmlrpc import base
-from .. wordpress_xmlrpc import compat
-from .. wordpress_xmlrpc import media
-from ..wordpress_xmlrpc.exceptions import InvalidCredentialsError
-from odoo.exceptions import Warning
+from odoo.tools.mimetypes import guess_mimetype
+# from .. python_magic_0_4_11 import magic
+from ..wordpress_xmlrpc import base
+from ..wordpress_xmlrpc import compat
+from ..wordpress_xmlrpc import media
 
-_logger = logging.getLogger("WooCommerce")
 
 class SpecialTransport(compat.xmlrpc_client.Transport):
-
+    '''
+    In this class transfer images from odoo to woo-commerce.
+    '''
     user_agent = 'Mozilla/5.0 (Windows NT 6.0) AppleWebKit/537.31 (KHTML, like Gecko) Chrome/26.0.1410.43 Safari/537.31'
 
 
-def upload_image(instance,image_data,image_name):
+def upload_image(instance, image_data, image_name, mime_type=False):
+    '''
+
+    :param instance:  Woo-active instance
+    :param image_data: Image Binary Data
+    :param image_name: Image Name
+    :param mime_type: Image Mime Type If Image have set.
+    :return: Its pass request of image in woo-commerce
+    '''
     if not image_data or not image_name:
         return {}
-
-    if instance.woo_admin_username and instance.woo_admin_password:
-        """Checking if username and password are correct or not."""
-        client = base.Client('%s/xmlrpc.php' % (instance.woo_host), instance.woo_admin_username,
-                             instance.woo_admin_password, transport=SpecialTransport())
-        try:
-            client.call(media.UploadFile(""))
-        except InvalidCredentialsError as error:
-            raise Warning(_("%s" % (error)))
-        except Exception as error:
-            _logger.info(_("%s") % (error))
-    # else:
-    #     raise Warning("Please enter valid username or password.\n""Go to Instance ==> 'Administrator Info' tab.")
-
-    data = base64.decodestring(image_data)
+    client = base.Client('%s/xmlrpc.php' % (instance.woo_host), instance.woo_admin_username,
+                         instance.woo_admin_password, transport=SpecialTransport())
+    # data = base64.decodebytes(image_data)
     # create a temporary file, and save the image
     fobj = tempfile.NamedTemporaryFile(delete=False)
     filename = fobj.name
-    image=fobj.write(data)
+    # image=fobj.write(data)
     fobj.close()
-    mimetype=magic.from_file(filename, mime=True)
+    if not mime_type:
+        mime_type = guess_mimetype(base64.b64decode(image_data))
     # prepare metadata
     data = {
-    'name': '%s_%s.%s'%(image_name,instance.id,mimetype.split(b"/")[1].decode('utf-8')),
-    'type': mimetype, # mimetype
+        'name': '%s_%s.%s' % (image_name, instance.id, mime_type.split("/")[1]),
+        'type': mime_type,  # mimetype
     }
-    
+
     # read the binary file and let the XMLRPC library encode it into base64
     with open(filename, 'rb') as img:
         data['bits'] = compat.xmlrpc_client.Binary(img.read())
-    
+
     res = client.call(media.UploadFile(data))
-    
+
     return res
 
+
 def fetch_image(image_url):
+    '''
+
+    :param image_url: ImageURL
+    :return: If get image then image content or False
+    '''
     if not image_url:
         return False
     try:
-        img=requests.get(image_url,stream=True,timeout=10)
+        img = requests.get(image_url, stream=True, timeout=10)
     except:
         img = False
     return img and base64.b64encode(img.content) or False
